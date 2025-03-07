@@ -1,77 +1,177 @@
 
-package PACKAGE
+package goconf
 
 import (
-
-  // this is a test.
+  // unit testing.
   "testing"
+  gt "github.com/kraasch/gotest/gotest"
 
-  // printing and formatting.
+  // local packages.
+  tu "github.com/kraasch/goconf/pkg/testutil"
+
+  // misc packages.
   "fmt"
-
-  // other imports.
-  "github.com/kraasch/godiff/godiff"
 )
 
 var (
   NL = fmt.Sprintln()
+  BASIC_CONF =
+    `title = "Basic Conf"                     ` + NL +
+    `[profiles]                               ` + NL +
+    `  [profiles.prettify-txt]                ` + NL +
+    `    name = "SomeProfile"                 ` + NL +
+    `    [profiles.prettify-txt.profile_rule] ` + NL +
+    `      word_separators = " ()"            ` + NL +
+    `      delete_chars    = ""               ` + NL +
+    `      small_gap_mark  = "-"              ` + NL +
+    `      big_gap_mark    = "_"              ` + NL +
+    `      conversions     = "caA"            ` + NL +
+    `      modes_string    = ""               ` + NL +
+    `                                         `
 )
 
-type TestList struct {
-  testName          string
-  isMulti           bool
-  inputArr          []string
-  inputArr2         []string
-  expectedValue     string
+func TestAll(t *testing.T) {
+  gt.DoTest(t, suites)
 }
 
-type TestSuite struct {
-  testingFunction   func(in TestList) string
-  tests             []TestList
-}
+/*
+* TODO: create tests:
+* - [ ] OpenDefaultConfig():
+*   - provide with default config.
+*   - provide with default config location.
+*   - create config if not exists.
+*   - read config file text as raw string.
+*/
 
-var suites = []TestSuite{
+var suites = []gt.TestSuite{
+
   /*
-  * Test for the function Toast().
+  * Test AutoReadConfig().
   */
   {
-    testingFunction:
-    func(in TestList) (out string) {
-      inputValue := in.inputArr[0]
-      out = Toast(inputValue)
-      return
+    TestingFunction:
+    func(t *testing.T, in gt.TestList) string {
+      // set test variables.
+      configPath    := in.InputArr[0]
+      configName    := in.InputArr[1]
+      configContent := in.InputArr[2]
+      // run test setup.
+      path := tu.MakeEmptyRealTestFs()
+      // start test.
+      c := Configurator{
+        ConfigFileName: configName,
+        PathToConfig:   configPath,
+        DefaultConfig:  configContent,
+      }
+      c.SetRoot(path)
+      output := c.AutoReadConfig()
+      // clean up test setup.
+      tu.CleanUpRealTestFs(path)
+      // return.
+      return output
     },
-    tests:
-    []TestList{
+    Tests:
+    []gt.TestList{
       {
-        testName:      "category_description_number00",
-        isMulti:       false,
-        inputArr:      []string{"is nice!"},
-        expectedValue: "\"Toast: is nice!\"",
+        TestName: "configurator_auto-test_00",
+        IsMulti:  true,
+        InputArr: []string{
+          ".config/renamer/", // config path.
+          "renamer.toml",     // config name.
+          BASIC_CONF,         // config content.
+        },
+        ExpectedValue:
+          BASIC_CONF,
       },
     },
   },
-}
 
-func TestAll(t *testing.T) {
-  for _, suite := range suites {
-    for _, test := range suite.tests {
-      name := test.testName
-      t.Run(name, func(t *testing.T) {
-        exp := test.expectedValue
-        got := suite.testingFunction(test)
-        if exp != got {
-          if test.isMulti {
-            t.Errorf("In '%s':\n", name)
-            diff := godiff.CDiff(exp, got)
-            t.Errorf("\nExp: '%#v'\nGot: '%#v'\n", exp, got)
-            t.Errorf("exp/got:\n%s\n", diff)
-          } else {
-            t.Errorf("In '%s':\n  Exp: '%#v'\n  Got: '%#v'\n", name, exp, got)
-          }
-        }
-      })
-    }
-  }
+  /*
+  * Test configurator:
+  *  - Configurator{}
+  *  - SetRoot()
+  *  - ExistsDefaultConfig()
+  *  - CreateDefaultConfig()
+  *  - ReadConfig()
+  */
+  {
+    TestingFunction:
+    func(t *testing.T, in gt.TestList) string {
+      // set test variables.
+      configPath    := in.InputArr[0]
+      configName    := in.InputArr[1]
+      configContent := in.InputArr[2]
+      // run test setup.
+      path := tu.MakeEmptyRealTestFs()
+      // start test.
+      c := Configurator{
+        ConfigFileName: configName,
+        PathToConfig:   configPath,
+        DefaultConfig:  configContent,
+      }
+      c.SetRoot(path)
+      if !c.ExistsDefaultConfig() {
+        c.CreateDefaultConfig()
+      }
+      output := c.ReadConfig()
+      // clean up test setup.
+      tu.CleanUpRealTestFs(path)
+      // return.
+      return output
+    },
+    Tests:
+    []gt.TestList{
+      {
+        TestName: "configurator_complex-test_00",
+        IsMulti:  true,
+        InputArr: []string{
+          ".config/renamer/", // config path.
+          "renamer.toml",     // config name.
+          BASIC_CONF,         // config content.
+        },
+        ExpectedValue:
+          BASIC_CONF,
+      },
+    },
+  },
+
+  /*
+  * Test configurator CreateFile(), ReadConfig().
+  */
+  {
+    TestingFunction:
+    func(t *testing.T, in gt.TestList) string {
+      // set test variables.
+      configPath    := in.InputArr[0]
+      configName    := in.InputArr[1]
+      configContent := in.InputArr[2]
+      // run test setup.
+      path := tu.MakeEmptyRealTestFs()
+      full := path + "/" + configPath
+      // start test.
+      CreateFile(full, configName, configContent)
+      output := ReadConfig(full + "/" + configName)
+      // clean up test setup.
+      tu.CleanUpRealTestFs(path)
+      // return.
+      return output
+    },
+    Tests:
+    []gt.TestList{
+      {
+        TestName: "configurator_basic-test_00",
+        IsMulti:  true,
+        InputArr: []string{
+          "config",         // config path.
+          "general.config", // config name.
+          BASIC_CONF,       // config content.
+        },
+        ExpectedValue:
+          BASIC_CONF,
+      },
+    },
+  },
+
+  /* Fin test suite. */
 }
 
